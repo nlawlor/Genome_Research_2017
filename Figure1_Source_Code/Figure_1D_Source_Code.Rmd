@@ -1,0 +1,72 @@
+---
+title: "Bulk Intact vs Ensemble Single Cell Transcriptome Correlation"
+output: 
+  pdf_document:
+  fig_caption: yes
+---
+
+# Scatter plot of Bulk Intact and Ensemble Single Cell Transcriptomes
+
+This report will mkae a scatter plot comparing log2 transcripts per million (TPM) of intact islet bulk RNA-seq (n = 5) and ensemble single cell (n = 978) RNA-seq data. Overall, the correlation between the two groups demonstrates high (rsq=0.87, p<0.001) Pearson’s correlation.
+
+```{r, eval=TRUE, echo=TRUE}
+rm(list = ls())
+suppressPackageStartupMessages(library(Biobase))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(edgeR))
+library(Biobase)
+library(ggplot2)
+library(edgeR)
+# Load in NonT2D single cell data
+setwd("/Users/lawlon/Documents/Final_RNA_Seq_3/Data/")
+load("nonT2D.rdata")
+sc <- exprs(cnts.eset)
+sc.anns <- pData(cnts.eset)
+sc.nonT2D.sel <- sc
+# Load in T2D data
+load("T2D.rdata")
+sc <- exprs(cnts.eset)
+sc.anns <- pData(cnts.eset)
+sc.T2D.sel <- sc
+# Combine the single cell data
+sc <- cbind(sc.T2D.sel,sc.nonT2D.sel)
+# Take averages across genes
+sc.r.mu <- apply(sc,1,mean)
+# Log transform the data
+sc.r.mu.log2 <- log2(sc.r.mu+1)
+
+# Load in bulk islet expression data
+load("/Users/lawlon/Documents/Final_RNA_Seq/islet_bulk_uniq_data.rdata")
+bulk.anns <- pData(bulk.cnts)
+# Extract expression data for bulk intact samples
+type <- which(bulk.anns$Type == "Intact")
+bulk <- exprs(bulk.cnts)
+bulk <- bulk[,type]
+# Take averages across genes
+bulk.r.mu <- apply(bulk,1,mean)
+# Log2 transform the data
+bulk.r.mu.log2 <- log2(bulk.r.mu +1)
+
+res <- data.frame(bulk = bulk.r.mu.log2, sc = sc.r.mu.log2)
+
+# R-squared to be displayed on plot
+Rsq <- cor(sc.r.mu.log2, bulk.r.mu.log2)**2
+msg <- paste("Rsq = ",format(Rsq,digits=2),sep="")
+
+# Make scatter plot
+ggplot(res, aes(x=bulk, y=sc)) + geom_point(shape=19,alpha=1/4,col="dodgerblue4",cex=.8) + 
+                annotate("text", x = 20, y = 5, label = msg) 
+
+```
+
+
+## Session Information
+```{r, eval=TRUE, echo=TRUE}
+suppressPackageStartupMessages(library(Biobase))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(edgeR))
+library(Biobase)
+library(ggplot2)
+library(edgeR)
+sessionInfo()
+```

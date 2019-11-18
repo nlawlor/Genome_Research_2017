@@ -1,0 +1,75 @@
+---
+title: "Cell Type Specific Gene Expression Differences Are Masked by Islet Cellular Heterogeneity"
+output: 
+  pdf_document:
+  fig_caption: yes
+---
+  
+# Introduction
+  
+We compared the transcriptional differences between T2D and ND endocrine cells without first segregating them into islet cell types (334 ND and 212 T2D single cell profiles). Approximately 2/3 of beta (n=165/248), one half of alpha (n=67/138), and over 90% of delta (n=23/24) cell-specific changes in gene expression were missed when cell types were not defined and specifically compared.The decreased heterogeneity in the transcriptional profiles of cell type-specific comparisons provides increased power in detecting the transcriptomic differences and validates the importance of single-cell analysis in understanding the molecular basis of T2D.
+
+```{r, eval=FALSE, echo=TRUE}
+rm(list=ls())
+# Load  in libraries
+suppressPackageStartupMessages(library(d3vennR))
+suppressPackageStartupMessages(library(venneuler))
+library(d3vennR)
+library(venneuler)
+rm(list=ls())
+
+# Load in differential lists
+setwd("/Users/lawlon/Documents/Final_RNA_Seq_3/Differential_Expression_3/Single_Cell/T2D_vs_NonT2D_3/Single_Cell/")
+
+beta <- read.csv("EdgeR.Robust.T2D.vs.NonT2D.Gender.Covariate.Beta.FDR.0.05.csv", 
+                 header = T, check.names = F, row.names = 1)
+alpha <- read.csv("EdgeR.Robust.T2D.vs.NonT2D.Gender.Covariate.Alpha.FDR.0.05.csv", 
+                  header = T, check.names = F, row.names = 1)
+delta <- read.csv("EdgeR.Robust.T2D.vs.NonT2D.Gender.Covariate.Delta.FDR.0.05.csv",
+                  header = T, check.names = F, row.names = 1)
+recon_endo <- read.csv("/Users/lawlon/Documents/Final_RNA_Seq_3/Differential_Expression_3/Single_Cell/T2D_vs_NonT2D_3/Reconstituted_Islet/EdgeR.Robust.T2D.vs.NonT2D.Gender.Covariate.Reconstituted_Islet.FDR.0.05.csv", 
+                       header = T, check.names = F, row.names = 1)
+
+# Perform intersections of DE genes with reconst pancreas and islets
+int.b.i <- intersect(beta$Associated.Gene.Name, recon_endo$Associated.Gene.Name)
+int.a.i <- intersect(alpha$Associated.Gene.Name, recon_endo$Associated.Gene.Name)
+int.d.i <- intersect(delta$Associated.Gene.Name, recon_endo$Associated.Gene.Name)
+
+# Intersection between alpha and beta
+int.b.a <- intersect(beta$Associated.Gene.Name, alpha$Associated.Gene.Name)
+int.b.d <- intersect(beta$Associated.Gene.Name, delta$Associated.Gene.Name)
+int.a.d <- intersect(alpha$Associated.Gene.Name, delta$Associated.Gene.Name)
+
+# intersection between three groups
+int.b.a.i. <- intersect(int.b.i, alpha$Associated.Gene.Name)
+int.b.d.i <- intersect(int.b.i, delta$Associated.Gene.Name)
+
+# create venn diagram
+venn <- venneuler(c(Beta = dim(beta)[1], Alpha = dim(alpha)[1], Delta = 50,
+                    Reconstituted_Islet = dim(recon_endo)[1], 
+                    "Beta&Reconstituted_Islet" = length(int.b.i),
+                    "Alpha&Reconstituted_Islet" = length(int.a.i), 
+                    "Delta&Reconstituted_Islet" = length(int.d.i),
+                    "Beta&Alpha"=length(int.b.a), "Beta&Delta"=length(int.b.d)))
+# venn diagram labels
+venn$labels <- c(
+  paste("Beta\n", dim(beta)[1]),
+  paste("Alpha\n", dim(alpha)[1]),
+  paste("Delta\n", dim(delta)[1]),
+  paste("Islet Single Cell Ensemble \n", dim(recon_endo)[1])
+)
+
+# Plot venn diagram
+plot(venn, col = c("#e41a1c", "#377eb8", "#4daf4a", "#654321"), cex = 1)
+
+```
+
+
+## Session Information
+```{r, eval=TRUE, echo=TRUE}
+suppressPackageStartupMessages(library(d3vennR))
+suppressPackageStartupMessages(library(venneuler))
+library(d3vennR)
+library(venneuler)
+sessionInfo()
+```

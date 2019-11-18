@@ -1,0 +1,77 @@
+---
+title: "Computational assignment of cell cycle phases shows islet single cell samples are not actively undergoing mitosis"
+output: 
+  pdf_document:
+  fig_caption: yes
+---
+  
+## Introduction
+
+We implemented the R-package scran_1.04 to investigate whether our dataset contained proliferative islet cells.  Specifically, we implemented the function “cyclone” to computationally assign single cell samples into cell cycle phases (G1, G2/M, or S phase) based on their expression of human cell cycle markers.
+
+## Islet Single Cells are not actively dividing
+
+```{r, eval=FALSE, echo=TRUE}
+rm(list = ls())
+suppressPackageStartupMessages(library(Biobase))
+suppressPackageStartupMessages(library(scran))
+library(Biobase)
+library(scran)
+# Load in single cell data
+setwd("/Users/lawlon/Documents/Final_RNA_Seq_3/Data/")
+load("nonT2D.rdata")
+p.anns <- featureData(cnts.eset)
+probe.anns <- as(p.anns,"data.frame")
+ND.anns <- pData(cnts.eset)
+# Remove multiples and keep all other groups
+ND.sel <- ND.anns[ND.anns$cell.type %in% c("INS", "PPY", "GCG", "SST", "COL1A1", "KRT19", "PRSS1", "none"),]
+# selected exp data
+ND.counts <- exprs(cnts.eset)
+ND.cnts.sel <- ND.counts[, rownames(ND.sel)]
+load("T2D.rdata")
+T2D.anns <- pData(cnts.eset)
+# Remove multiples and keep all other groups
+T2D.sel <- T2D.anns[T2D.anns$cell.type %in% c("INS", "PPY", "GCG", "SST", "COL1A1", "KRT19", "PRSS1", "none"),]
+# selected exp data
+T2D.counts <- exprs(cnts.eset)
+T2D.cnts.sel <- T2D.counts[, rownames(T2D.sel)]
+# Combine sample anns and expression data
+all.counts <- cbind(ND.cnts.sel, T2D.cnts.sel)
+s.anns.sel <- rbind(ND.sel, T2D.sel)
+# create sce object
+sce <- newSCESet(countData=data.frame(all.counts))
+# normalize cell specific biases
+sce <- computeSumFactors(sce, sizes=c(20, 40, 60, 80))
+summary(sizeFactors(sce))
+sce <- normalize(sce)
+colnames(sce) <- colnames(all.counts)
+# Get normalized exp data
+scran.data <- exprs(sce)
+colnames(scran.data) <- colnames(all.counts)
+# load human cell cycle markers
+hs.pairs <- readRDS(system.file("exdata", "human_cycle_markers.rds", package="scran"))
+assigned <- cyclone(sce, pairs=hs.pairs)
+head(assigned$scores)
+
+phase <- rep("S", ncol(sce))
+phase[assigned$scores$G1 > 0.5] <- "G1"
+phase[assigned$scores$G2M > 0.5] <- "G2M"
+phase[assigned$scores$G1 > 0.5 & assigned$scores$G2M > 0.5] <- "unknown"
+table(phase)
+
+# append cell cycle info to sample anns
+s.cc <- cbind(s.anns.sel, phase)
+# table of cell type vs cell cycle phase
+tab <- table(s.cc$cell.type, s.cc$phase)
+
+```
+
+
+## Session Information
+```{r, eval=TRUE, echo=TRUE}
+suppressPackageStartupMessages(library(Biobase))
+suppressPackageStartupMessages(library(scran))
+library(Biobase)
+library(scran)
+sessionInfo()
+```

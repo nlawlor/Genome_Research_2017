@@ -1,0 +1,165 @@
+---
+title: "Delta Cell Receptor Heatmap"
+output: 
+  pdf_document:
+  fig_caption: yes
+---
+
+## Introduction
+
+This report will explain the steps used to make a heatmap produce of average log2(CPM) expression of selected delta cell receptor genes across all non-diabetic single cell samples. All non-diabetic samples were included in the heat map excluding "none" and "multiple" classified samples. 
+
+```{r, eval=TRUE, echo=TRUE}
+# Load in libraries
+suppressPackageStartupMessages(library(Biobase))
+suppressPackageStartupMessages(library(pheatmap))
+suppressPackageStartupMessages(library(RColorBrewer))
+suppressPackageStartupMessages(library(edgeR))
+suppressPackageStartupMessages(library(gplots))
+suppressPackageStartupMessages(library(ggplot2))
+library(Biobase)
+library(pheatmap)
+library(gplots)
+library(ggplot2)
+library(edgeR)
+library(RColorBrewer)
+rm(list=ls())
+# Load in data
+setwd("/Users/lawlon/Documents/Final_RNA_Seq_3/Data/")
+load("nonT2D.rdata")
+s.anns <- pData(cnts.eset)
+p.anns <- as(featureData(cnts.eset), "data.frame")
+counts <- exprs(cnts.eset)
+# Calculate the cpm of the data
+cpms <- cpm(x = counts)
+data <- log2(cpms+1)
+
+# Load in bulk data
+load("/Users/lawlon/Documents/Final_RNA_Seq/islet_bulk_uniq_data.rdata")
+bulk.counts <- exprs(bulk.cnts)
+bulk.anns <- pData(bulk.cnts)
+# Get bulk intact, ND samples
+intact <- which(bulk.anns$Type == "Intact" & bulk.anns$Phenotype == "ND")
+# Calculate cpm
+bulk.cpm <- cpm(x = bulk.counts)
+bulk.log <- log2(bulk.cpm+1)
+bulk.sel <- bulk.log[, intact]
+bulk.avg <- rowMeans(bulk.sel)
+
+# Get cell types in order
+s.1 <- s.anns[s.anns$cell.type %in% c("INS"),]
+s.2 <- s.anns[s.anns$cell.type %in% c("GCG"),]
+s.3 <- s.anns[s.anns$cell.type %in% c("SST"),]
+s.4 <- s.anns[s.anns$cell.type %in% c("PPY"),]
+s.5 <- s.anns[s.anns$cell.type %in% c("PRSS1"),]
+s.6 <- s.anns[s.anns$cell.type %in% c("KRT19"),]
+s.7 <- s.anns[s.anns$cell.type %in% c("COL1A1"),]
+
+# Get Expression matrices and average mean expression
+f.1 <- data[, rownames(s.1)]
+avg1 <- rowMeans(f.1)
+f.2 <- data[, rownames(s.2)]
+avg2 <- rowMeans(f.2)
+f.3 <- data[, rownames(s.3)]
+avg3 <- rowMeans(f.3)
+f.4 <- data[, rownames(s.4)]
+avg4 <- rowMeans(f.4)
+f.5 <- data[, rownames(s.5)]
+avg5 <- rowMeans(f.5)
+f.6 <- data[, rownames(s.6)]
+avg6 <- rowMeans(f.6)
+f.7 <- data[, rownames(s.7)]
+avg7 <- rowMeans(f.7)
+
+# Match up cell type with hormone marker
+namelist <- c(INS="Beta", GCG="Alpha", SST="Delta", PPY="Gamma",
+              GHRL="Epsilon", COL1A1="Stellate", PRSS1="Acinar", KRT19="Ductal", none="None")
+
+# Combine all cell expression data into one matrix
+mat.orig <- cbind(f.1, f.2, f.3, f.4,f.5, f.6, f.7)
+mat.avg <- cbind(avg1, avg2, avg3, avg4, avg5, avg6, avg7, bulk.avg)
+colnames(mat.avg) <- c("Beta", "Alpha", "Delta", "Gamma","Acinar", "Ductal", "Stellate", "Bulk")
+# Transpose avg matrix
+trans.mat <- t(mat.avg)
+# Change colnames of mat to gene symbol
+colnames(trans.mat) <- p.anns$Associated.Gene.Name
+
+# Specify genes of interest
+genes.sel <- c("LEPR", "GHSR", "DRD2", "HHEX")
+
+genes.ids <- NULL
+for (i in 1:length(genes.sel)) {
+  idx <- which(colnames(trans.mat) == genes.sel[i])
+  genes.ids <- c(genes.ids, idx)
+}
+
+# Extract genes of interest
+mat.sel <- trans.mat[, genes.ids]
+
+# Mean center the data
+# Mean center by column (gene)
+center_apply <- function(x) {
+  apply(x, 2, function(y) y - mean(y))
+}
+
+mat.center <- center_apply(mat.sel)
+
+# Scale the data between -1 and 1
+nor.min.max <- function(x) {
+  if (is.numeric(x) == FALSE) {
+    stop("Please input numeric for x")
+  }
+  x.min <- min(x)
+  x.max <- max(x)
+  x <- 2*((x - x.min) / (x.max - x.min)) - 1
+  return (x)
+}
+
+# Only use if want to scale data
+mat.scale <- t(apply(mat.center, 1, nor.min.max))
+
+# Annotation matrix
+annotation_col = data.frame(Cell_Type = colnames(mat.scale))
+rownames(annotation_col) <- colnames(mat.scale)
+
+# Specify cell type colors
+grey <- brewer.pal(n=9, name="Greys")
+
+# change column names
+rownames(mat.sel) <- c("Beta", "Alpha", "Delta", 
+                       "Gamma","Acinar", "Ductal", "Stellate", "Bulk")
+# transpose again
+mat.sel <- t(mat.sel)
+```
+\pagebreak
+
+```{r, eval=TRUE, echo=TRUE, fig.show='hold', fig.width=11, fig.height=11, fig.align='center', fig.cap='Heat map of average log2(CPM) expression of delta cell receptor genes across non-diabetic endocrine single cell samples.', warning=FALSE}
+# Make heatmap
+pheatmap(mat = mat.sel, cluster_rows = FALSE, cluster_cols = FALSE,
+         color =  colorRampPalette(brewer.pal(n = 7, name ="Greys"))(20),
+         clustering_distance_rows = NULL,
+         clustering_method=NULL,show_rownames=TRUE,
+         show_colnames = TRUE, annotation_names_row = TRUE,
+         annotation_names_col = FALSE, trace = "none", fontsize_row = 8,
+         cellwidth = 20, cellheight = 20, annotation_legend = FALSE)
+```
+
+
+## Session Information
+```{r, eval=TRUE, echo=TRUE}
+# Load libraries
+suppressPackageStartupMessages(library(Biobase))
+suppressPackageStartupMessages(library(pheatmap))
+suppressPackageStartupMessages(library(RColorBrewer))
+suppressPackageStartupMessages(library(edgeR))
+suppressPackageStartupMessages(library(gplots))
+suppressPackageStartupMessages(library(ggplot2))
+library(Biobase)
+library(pheatmap)
+library(gplots)
+library(ggplot2)
+library(edgeR)
+library(RColorBrewer)
+sessionInfo()
+```
+

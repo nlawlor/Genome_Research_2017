@@ -1,0 +1,139 @@
+---
+title: "Unsupervised Hierarchical Clustering of Non-diabetic Single Cell Ensemble Transcriptomes Without Hormone Marker Genes"
+output: 
+  pdf_document:
+  fig_caption: yes
+---
+  
+## Introduction
+
+This file will detail the steps used to perform unsupervised hierarchical clustering analysis on the non-diabetic single cell transcriptomes without using pancreatic cell hormone marker genes (INS, GCG, SST, PPY, GHRL, COL1A1, PRSS1, and KRT19) as shown in Supplemental Fig S7. 
+
+## Hierarchical Clustering
+
+```{r, eval=FALSE, echo=TRUE}
+suppressPackageStartupMessages(library(Biobase))
+suppressPackageStartupMessages(library(edgeR))
+suppressPackageStartupMessages(library(ape))
+suppressPackageStartupMessages(library(gplots))
+suppressPackageStartupMessages(library(dendextend))
+suppressPackageStartupMessages(library(RColorBrewer))
+library(edgeR)
+library(Biobase)
+library(gplots)
+library(dendextend)
+library(ape)
+library(RColorBrewer)
+rm(list=ls())
+set.seed(53079239)
+# File name
+fname = "NonT2D.log2cpm.no.hormones"
+setwd("/Users/lawlon/Documents/Final_RNA_Seq_3/Data/")
+# Load single cell data
+load("nonT2D.rdata")
+p.anns <- featureData(cnts.eset)
+probe.anns <- as(p.anns,"data.frame")
+ND.anns <- pData(cnts.eset)
+# Remove multiples and keep all other groups
+ND.sel <- ND.anns[ND.anns$cell.type %in% c("INS", "PPY", "GCG", "SST",
+                      "COL1A1", "KRT19", "PRSS1", "none"),]
+ND.counts <- exprs(cnts.eset)
+cpms <- cpm(x = ND.counts)
+data <- log2(cpms+1)
+data <- data[,rownames(ND.sel)]
+# Combine sample anns and expression data
+s.anns.sel <- ND.sel
+r.max <- apply(data,1,max)
+# Use highly expressed genes
+data.sel <- data[r.max > 10.5,]
+ND.data.sel<- data.sel[, rownames(ND.sel)]
+
+# Remove hormonal genes from list
+horm <- which(probe.anns$Associated.Gene.Name %in% c("INS","GCG","PPY","SST", "GHRL",
+                                                 "COL1A1", "PRSS1", "KRT19"))
+ids <- rownames(probe.anns)[horm]
+indices <- which(rownames(ND.data.sel) %in% ids)
+ND.data.sel <- ND.data.sel[-indices,]
+
+# Save a copy of the data
+exp.sel <- ND.data.sel
+# Change column name labels to cell type
+colnames(ND.data.sel)[1:dim(ND.sel)[1]] <- ND.sel$cell.type
+
+# Change name of one KRT19 cell to ghrelin cell
+g <- which(probe.anns$Associated.Gene.Name == "GHRL")
+ghrl <- data[g,]
+samp <- which(ghrl > 15)
+g.idx <- which(rownames(s.anns.sel) == names(samp))
+colnames(ND.data.sel)[g.idx] <- "GHRL"
+
+p.res <- probe.anns[rownames(ND.data.sel),]
+# Combine probe anns with selected cpm values
+ND.data.sel.exp <- cbind(p.res,ND.data.sel)
+# Write genes used for clustering to file
+write.csv(ND.data.sel.exp, paste(fname, "genes_selected_for_cing.csv", sep = "."))
+
+# Dendrogram of samples using hclust
+d <- dist(t(ND.data.sel))
+hc.final <- hclust(d,method="ward.D2")
+
+# Change hclust object to dendrogram
+dend1 <- as.dendrogram(hc.final)
+groupCodes <- s.anns.sel$cell.type
+
+# Color Schema
+grey <- brewer.pal(n=9, name="Greys")
+colorCodes <- c(INS="#e41a1c", GCG = "#377eb8", SST = "#4daf4a",
+                PPY = "#984ea3", GHRL = "#ff7f00",
+                COL1A1 = grey[9], PRSS1 = grey[7], KRT19 = grey[5],
+                none = grey[3])
+
+namelist <- c("Beta", "Alpha", "Delta", "Gamma", "Epsilon", 
+              "Stellate", "Acinar", "Ductal", "none")
+# Change label colors
+labels_colors(dend1) <- colorCodes[groupCodes][order.dendrogram(dend1)]
+
+# Change dend to phylo object
+dend2 <- as.phylo(dend1)
+
+# Match up colors and labels
+cols = NULL
+for (i in 1:length(labels(dend2))) {
+  if ((dend2$tip.label[i] %in% names(colorCodes)) == TRUE) {
+    cols <- c(cols, colorCodes[dend2$tip.label[i]])
+  }
+}
+
+#Use the long hyphen or the minus sign instead of regular hyphen symbol
+labels(dend2) <- rep(x = "–", length(labels(dend2)))
+
+# Create high resolution tiff of dendrogram
+tiff(file=paste(fname, "dendrogram.tiff", sep = "."), 
+    width = 9000, height = 9000, units = "px", res = 800)
+plot(dend2, type = "fan", tip.color = cols, cex = 6.5, label.offset = 0)
+legend("bottomleft", title = "Cell Types", title.col = "black",
+       legend = c(expression(bold("Beta (INS)")), expression(bold("Alpha (GCG)")),
+                  expression(bold("Delta (SST)")), expression(bold("Gamma (PPY)")),
+                  expression(bold("Epsilon (GHRL)")),
+                  expression(bold("Stellate (COL1A1)")), expression(bold("Acinar (PRSS1)")),
+                  expression(bold("Ductal (KRT19)")), expression(bold("None"))), text.col = colorCodes,
+       cex = 0.75, xjust=0, yjust=0)
+dev.off()
+```
+
+## Session Information
+```{r, eval=TRUE, echo=TRUE}
+suppressPackageStartupMessages(library(Biobase))
+suppressPackageStartupMessages(library(edgeR))
+suppressPackageStartupMessages(library(ape))
+suppressPackageStartupMessages(library(gplots))
+suppressPackageStartupMessages(library(dendextend))
+suppressPackageStartupMessages(library(RColorBrewer))
+library(edgeR)
+library(Biobase)
+library(gplots)
+library(dendextend)
+library(ape)
+library(RColorBrewer)
+sessionInfo()
+```

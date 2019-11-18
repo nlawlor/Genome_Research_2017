@@ -1,0 +1,145 @@
+---
+title: "Unsupervised Hierarchical Clustering of Non-Diabetic Single Cell Data"
+output:
+  pdf_document: default
+  html_document:
+    fig_caption: yes
+---
+
+## Introduction
+  
+This report describes the methods used to perform unsupervised hierarchical clustering of the non-diabetic single cell data. The samples were clustered using highly expressed genes with log2(CPM) values greater than 10.5 in at least one sample. The clustering was performed using the "hclust" function using Euclidean distance and Ward.D2 linkage. The resultant “fan” dendrogram image was produced using the “ape” and "dendextend" R-packages. 
+
+Reference: Paradis E., Claude J. & Strimmer K. 2004. APE: analyses of phylogenetics and evolution in R language. Bioinformatics 20: 289-290.
+
+## Preprocessing Steps
+
+All single cell samples from our non-diabetic cohort were used except for the cells labeled as "multiples" yielding a total of 380 samples. Only highly expressed genes with a log2 CPM expression level greater than 10.5 in at least one sample were used to perform the clustering. Ultimately, 1824 genes were used in the analysis. A two dimensional plot of the resultant dendrogram is shown in the figure below. Similar unsupervised hierarchical clustering analyses were performed on the non-diabetic and Type 2 diabetic single cell data combined and Type 2 diabetic data alone.
+
+```{r, eval=TRUE, echo=TRUE, fig.show='hold', fig.width=14, fig.height=14, fig.align='center', fig.cap='Figure 1: Unsupervised hierarchical clustering of non-diabetic single cell data using genes with log2(CPM) values greater than 10.5 in at least one sample.', warning=FALSE}
+# Load libraries
+suppressPackageStartupMessages(library(Biobase))
+suppressPackageStartupMessages(library(gplots))
+suppressPackageStartupMessages(library(dendextend))
+suppressPackageStartupMessages(library(ape))
+suppressPackageStartupMessages(library(knitr))
+suppressPackageStartupMessages(library(RColorBrewer))
+suppressPackageStartupMessages(library(edgeR))
+library(Biobase)
+library(gplots)
+library(dendextend)
+library(ape)
+library(knitr)
+library(RColorBrewer)
+library(edgeR)
+set.seed(53079239)
+
+# Load NonT2D single cell data
+setwd("/Users/lawlon/Documents/Final_RNA_Seq_3/Data/")
+load("nonT2D.rdata")
+p.anns <- featureData(cnts.eset)
+probe.anns <- as(p.anns,"data.frame")
+ND.anns <- pData(cnts.eset)
+# Remove multiples and keep all other groups
+ND.sel <- ND.anns[ND.anns$cell.type %in% c("INS", "PPY", "GCG", "SST", "COL1A1", "KRT19", "PRSS1", "none"),]
+
+# Obtain counts
+ND.counts <- exprs(cnts.eset)
+# Calculate log2 cpm
+cpms <- cpm(x = ND.counts)
+data <- log2(cpms+1)
+data <- data[, rownames(ND.sel)]
+
+# Filter gene by those with max CPM value greater than 10 (high expressed genes)
+r.max <- apply(data,1,max)
+ND.data.sel <- data[r.max > 10.5,]
+
+# Change column name labels to cell type
+colnames(ND.data.sel)[1:dim(ND.sel)[1]] <- ND.sel$cell.type
+
+# Change name of one KRT19 cell (which is ghrelin positive) to ghrelin cell label
+g <- which(probe.anns$Associated.Gene.Name == "GHRL")
+ghrl <- data[g,]
+samp <- which(ghrl > 15)
+g.idx <- which(rownames(ND.sel) == names(samp))
+colnames(ND.data.sel)[g.idx] <- "GHRL"
+
+# Combine probe anns with selected fpkm values
+p.res <- probe.anns[rownames(ND.data.sel),]
+ND.data.sel.exp <- cbind(p.res,ND.data.sel)
+
+# Write selected gene matrix to file
+#write.csv(ND.data.sel.exp, paste(fname, "genes_selected_for_cing.csv", sep = "."))
+
+# Create an hclust object 
+d <- dist(t(ND.data.sel))
+hc.final <- hclust(d,method="ward.D2")
+
+# Change hclust object to dendrogram
+dend1 <- as.dendrogram(hc.final)
+groupCodes <- ND.sel$cell.type
+
+# Color Schema
+grey <- brewer.pal(n=9, name="Greys")
+
+# Specify a color for each cell type
+colorCodes <- c(INS="#e41a1c", GCG = "#377eb8", SST = "#4daf4a", PPY = "#984ea3", GHRL = "#ff7f00",
+                COL1A1 = grey[9], PRSS1 = grey[7], KRT19 = grey[5],
+                none = grey[3])
+
+# Names of the cell types corresponding to hormone marker genes
+namelist <- c("Beta", "Alpha", "Delta", "Gamma", "Epsilon", "Stellate", "Acinar", "Ductal", "none")
+
+# Assign color labels to the dendrogram
+labels_colors(dend1) <- colorCodes[groupCodes][order.dendrogram(dend1)]
+
+# Change dendrogram object to phylo object to make fan dendrogram later
+dend2 <- as.phylo(dend1)
+
+# Match up colors and labels
+cols = NULL
+for (i in 1:length(labels(dend2))) {
+  if ((dend2$tip.label[i] %in% names(colorCodes)) == TRUE) {
+    cols <- c(cols, colorCodes[dend2$tip.label[i]])
+  }
+}
+
+# Change labels of dendrogram to hyphen symbol for visualization
+labels(dend2) <- rep(x = "—", length(labels(dend2)))
+
+# Set margins
+par(mar = c(0,0,0,0))
+
+plot(dend2, type = "fan", tip.color = cols, cex = 8.0, label.offset = 0)
+legend("bottomleft", title = "Cell Types", title.col = "black",
+       legend = c(expression(bold("Beta (INS)")), expression(bold("Alpha (GCG)")), 
+       expression(bold("Delta (SST)")), expression(bold("Gamma (PPY)")),  expression(bold("Epsilon (GHRL)")), 
+       expression(bold("Stellate (COL1A1)")), expression(bold("Acinar (PRSS1)")),
+       expression(bold("Ductal (KRT19)")), expression(bold("None"))), text.col = colorCodes, 
+       cex = 0.75, xjust=0, yjust=0)
+
+# Note that increasing the cex value when plotting can make the color bars appear more blended
+# In addition, producing a high resolution tiff image as output is recommended:
+  # tiff(file=paste(fname, "dendrogram.tiff", sep = "."), 
+  #  width = 9000, height = 9000, units = "px", res = 800)
+
+```
+
+## Session Information
+```{r, eval=TRUE, echo=TRUE}
+suppressPackageStartupMessages(library(Biobase))
+suppressPackageStartupMessages(library(gplots))
+suppressPackageStartupMessages(library(dendextend))
+suppressPackageStartupMessages(library(ape))
+suppressPackageStartupMessages(library(knitr))
+suppressPackageStartupMessages(library(RColorBrewer))
+suppressPackageStartupMessages(library(edgeR))
+library(Biobase)
+library(gplots)
+library(dendextend)
+library(ape)
+library(knitr)
+library(RColorBrewer)
+library(edgeR)
+sessionInfo()
+```

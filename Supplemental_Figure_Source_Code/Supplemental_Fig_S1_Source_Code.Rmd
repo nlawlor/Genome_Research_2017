@@ -1,0 +1,94 @@
+---
+title: "Correlations of Baseline, Intact, and Dissociated Bulk Islet Transcriptomes"
+output: 
+  pdf_document:
+  fig_caption: yes
+---
+  
+## Introduction
+  
+Islets with high purity and viability were obtained from 8 human cadaveric organ donors and cultured (Methods) overnight to recover from shipment (Table_S1; 5 non-diabetic (ND) and 3 type 2 diabetic (T2D)).  For each islet sample, cDNA was prepared from single cells on the Fluidigm C1 chip and from paired whole islet (Baseline, Intact) and single cell suspension “bulk” samples (Dissociated) as shown in Fig. 1A using the SMARTer2 protocol. Total processing and handling time for each islet was  less than or equal to 60 minutes. Ultimately, Baseline, Intact, and Dissociated transcriptomes from each patient were highly correlated.
+
+## Correlation of Bulk Transcriptomes within Each Patient
+
+```{r, eval=FALSE, echo=TRUE}
+suppressPackageStartupMessages(library(Biobase))
+suppressPackageStartupMessages(library(gplots))
+suppressPackageStartupMessages(library(ggplot2))
+library(Biobase)
+library(gplots)
+library(ggplot2)
+rm(list=ls())
+setwd("/Users/lawlon/Documents/RNA-seq/RNA-seq Data/Bulk Islet Data/")
+load("islet_bulk_uniq_data.rdata")
+
+s.anns <- read.csv(file = "Unique Bulk Data/sample_anns_unique_bulk_samples.csv", 
+                            header = TRUE, check.names = FALSE, row.names = 1)
+bulk.counts <- exprs(bulk.cnts)
+log.tpm <- log2(bulk.counts+1)
+
+# Indicate patient name
+name <- c("Patient.1", "Patient.2", "Patient.3", "Patient.4",
+          "Patient.5", "Patient.6", "Patient.7", "Patient.8")
+p.id <- c("P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8")
+
+# Start of loop
+setwd("/Users/lawlon/Documents/Final_RNA_Seq_3/Correlations_3/Bulk_within_Patient_Correlations/")
+pdf(file = "Patient.bulk.correlation.scatterplots.pdf", onefile = TRUE)
+par(mfrow = c(5,5), pty = "s", cex.lab = 0.75, cex.axis=0.75, mgp = c(1.25,0.5,0), mar = c(2.5,2,0.5,0.5))
+
+for (i in 1:length(p.id)) {
+
+# Specify patient number
+pat1 <- which(s.anns$`Patient Number` == p.id[i])
+p1.anns <- s.anns[pat1,]
+
+# Plot log2 tpm of patient intact vs baseline
+p1.in <- which(p1.anns$Type == "Intact")
+p1.bl <- which(p1.anns$Type == "Baseline")
+p1.d <- which(p1.anns$Type == "Dissociated")
+
+# Make a panel of plots, first intact vs baseline
+plot(log.tpm[,rownames(p1.anns)[p1.in]], log.tpm[, rownames(p1.anns)[p1.bl]], 
+     xlab = paste(p.id[i], "IN log2(TPM)", sep = " "), ylab = paste(p.id[i], "BL log2(TPM)", sep = " "),
+     xlim = c(0,20), ylim = c(0,20))
+
+Rsq <- cor(log.tpm[,rownames(p1.anns)[p1.in]], log.tpm[, rownames(p1.anns)[p1.bl]])**2
+msg <- paste("Rsq = ",format(Rsq,digits=2),sep="")
+text(14,1, msg, cex = 0.75)
+
+# Plot log2 tpm of pat1 intact vs diss
+plot(log.tpm[,rownames(p1.anns)[p1.in]], log.tpm[, rownames(p1.anns)[p1.d]], 
+     xlab = paste(p.id[i], "IN log2(TPM)", sep = " "), ylab = paste(p.id[i], "DI log2(TPM)", sep = " "),
+     xlim = c(0,20), ylim = c(0,20))
+
+Rsq <- cor(log.tpm[,rownames(p1.anns)[p1.in]], log.tpm[, rownames(p1.anns)[p1.d]])**2
+msg <- paste("Rsq = ",format(Rsq,digits=2),sep="")
+text(14,1, msg, cex = 0.75)
+
+# Plot log2 tpm of baseline vs diss
+plot(log.tpm[,rownames(p1.anns)[p1.bl]], log.tpm[, rownames(p1.anns)[p1.d]], 
+     xlab = paste(p.id[i], "BL log2(TPM)", sep = " "), ylab = paste(p.id[i], "DI log2(TPM)", sep = " "),
+     xlim = c(0,20), ylim = c(0,20))
+
+Rsq <- cor(log.tpm[,rownames(p1.anns)[p1.bl]], log.tpm[, rownames(p1.anns)[p1.d]])**2
+msg <- paste("Rsq = ",format(Rsq,digits=2),sep="")
+text(14,1, msg, cex = 0.75)
+
+}
+
+dev.off()
+```
+
+
+## Session Information
+```{r, eval=TRUE, echo=TRUE}
+suppressPackageStartupMessages(library(Biobase))
+suppressPackageStartupMessages(library(gplots))
+suppressPackageStartupMessages(library(ggplot2))
+rm(list = ls())
+library(Biobase)
+library(gplots)
+library(ggplot2)
+sessionInfo()
+```
